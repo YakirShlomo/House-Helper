@@ -4,15 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/app_router.dart';
 import 'generated/l10n/app_localizations.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const ProviderScope(child: HouseHelperApp()));
 }
 
-class HouseHelperApp extends StatelessWidget {
+class HouseHelperApp extends ConsumerWidget {
   const HouseHelperApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
       title: 'House Helper',
       debugShowCheckedModeBanner: false,
@@ -57,7 +58,7 @@ class HouseHelperApp extends StatelessWidget {
       },
       
       // Router
-      routerConfig: AppRouter.router,
+      routerConfig: AppRouter.createRouter(ref),
     );
   }
 }

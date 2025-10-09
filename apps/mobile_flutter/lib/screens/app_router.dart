@@ -7,62 +7,89 @@ import 'home_screen.dart';
 import 'tasks_screen.dart';
 
 class AppRouter {
-  static final router = GoRouter(
-    initialLocation: '/',
-    routes: [
-      // Home
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const HomeScreen(),
-      ),
-      
-      // Auth routes
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
-      GoRoute(
-        path: '/signup',
-        builder: (context, state) => const SignupScreen(),
-      ),
-      
-      // Tasks
-      GoRoute(
-        path: '/tasks',
-        builder: (context, state) => const TasksScreen(),
-      ),
-      
-      // Shopping
-      GoRoute(
-        path: '/shopping',
-        builder: (context, state) => const ShoppingScreen(),
-      ),
-      
-      // Bills
-      GoRoute(
-        path: '/bills',
-        builder: (context, state) => const BillsScreen(),
-      ),
-      
-      // Activity
-      GoRoute(
-        path: '/activity',
-        builder: (context, state) => const ActivityScreen(),
-      ),
-      
-      // Settings
-      GoRoute(
-        path: '/settings',
-        builder: (context, state) => const SettingsScreen(),
-      ),
-      
-      // Profile
-      GoRoute(
-        path: '/profile',
-        builder: (context, state) => const ProfileScreen(),
-      ),
-    ],
-  );
+  static GoRouter createRouter(WidgetRef ref) {
+    // Listen to auth state changes
+    final authNotifier = ValueNotifier<AuthState>(ref.read(authStateProvider));
+    ref.listen<AuthState>(authStateProvider, (_, next) {
+      authNotifier.value = next;
+    });
+    
+    return GoRouter(
+      initialLocation: '/login',
+      refreshListenable: authNotifier,
+      redirect: (context, state) {
+        final authState = ref.read(authStateProvider);
+        final isLoggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/signup';
+        
+        if (authState is AuthAuthenticated) {
+          // User is authenticated
+          if (isLoggingIn) {
+            return '/';
+          }
+          return null; // Allow navigation
+        } else {
+          // User is not authenticated
+          if (!isLoggingIn) {
+            return '/login';
+          }
+          return null; // Allow login/signup
+        }
+      },
+      routes: [
+        // Home
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const HomeScreen(),
+        ),
+        
+        // Auth routes
+        GoRoute(
+          path: '/login',
+          builder: (context, state) => const LoginScreen(),
+        ),
+        GoRoute(
+          path: '/signup',
+          builder: (context, state) => const SignupScreen(),
+        ),
+        
+        // Tasks
+        GoRoute(
+          path: '/tasks',
+          builder: (context, state) => const TasksScreen(),
+        ),
+        
+        // Shopping
+        GoRoute(
+          path: '/shopping',
+          builder: (context, state) => const ShoppingScreen(),
+        ),
+        
+        // Bills
+        GoRoute(
+          path: '/bills',
+          builder: (context, state) => const BillsScreen(),
+        ),
+        
+        // Activity
+        GoRoute(
+          path: '/activity',
+          builder: (context, state) => const ActivityScreen(),
+        ),
+        
+        // Settings
+        GoRoute(
+          path: '/settings',
+          builder: (context, state) => const SettingsScreen(),
+        ),
+        
+        // Profile
+        GoRoute(
+          path: '/profile',
+          builder: (context, state) => const ProfileScreen(),
+        ),
+      ],
+    );
+  }
 }
 
 class LoginScreen extends ConsumerStatefulWidget {

@@ -26,5 +26,10 @@
   "forgotPassword": "Forgot Password?",
   "signUp": "Sign Up",
   "welcome": "Welcome to House Helper",
-  "manageHousehold": "Manage your household with ease"
+  "manageHousehold": "Manage your household with ease",
+  "error": "Error",
+  "errorDetails": "Error Details",
+  "retry": "Retry",
+  "networkError": "Network connection failed. Please check your internet connection and try again.",
+  "authError": "Authentication required. Please log in to continue."
 }
