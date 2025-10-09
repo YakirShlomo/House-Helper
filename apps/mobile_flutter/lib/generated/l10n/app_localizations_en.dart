@@ -88,4 +88,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get manageHousehold => 'Manage your household with ease';
+
+  @override
+  String get error => 'Error';
+
+  @override
+  String get errorDetails => 'Error Details';
+
+  @override
+  String get retry => 'Retry';
+
+  @override
+  String get networkError =>
+      'Network connection failed. Please check your internet connection and try again.';
+
+  @override
+  String get authError => 'Authentication required. Please log in to continue.';
 }

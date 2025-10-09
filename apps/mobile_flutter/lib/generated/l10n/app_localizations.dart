@@ -259,6 +259,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manage your household with ease'**
   String get manageHousehold;
+
+  /// No description provided for @error.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get error;
+
+  /// No description provided for @errorDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Error Details'**
+  String get errorDetails;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
+
+  /// No description provided for @networkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Network connection failed. Please check your internet connection and try again.'**
+  String get networkError;
+
+  /// No description provided for @authError.
+  ///
+  /// In en, this message translates to:
+  /// **'Authentication required. Please log in to continue.'**
+  String get authError;
 }
 
 class _AppLocalizationsDelegate

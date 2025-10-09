@@ -88,4 +88,20 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String get manageHousehold => 'נהלו את הבית שלכם בקלות';
+
+  @override
+  String get error => 'שגיאה';
+
+  @override
+  String get errorDetails => 'פרטי השגיאה';
+
+  @override
+  String get retry => 'נסה שוב';
+
+  @override
+  String get networkError =>
+      'החיבור לאינטרנט נכשל. אנא בדוק את החיבור שלך ונסה שוב.';
+
+  @override
+  String get authError => 'נדרשת הזדהות. אנא התחבר כדי להמשיך.';
 }
