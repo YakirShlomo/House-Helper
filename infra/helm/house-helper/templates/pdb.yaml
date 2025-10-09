@@ -1,0 +1,109 @@
+{{- if .Values.api.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "house-helper.fullname" . }}-api
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "api" | nindent 4 }}
+spec:
+  {{- if .Values.api.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.api.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.api.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.api.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "house-helper.selectorLabels" . | nindent 6 }}
+      {{- include "house-helper.componentLabels" "api" | nindent 6 }}
+{{- end }}
+---
+{{- if .Values.notifier.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "house-helper.fullname" . }}-notifier
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "notifier" | nindent 4 }}
+spec:
+  {{- if .Values.notifier.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.notifier.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.notifier.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.notifier.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "house-helper.selectorLabels" . | nindent 6 }}
+      {{- include "house-helper.componentLabels" "notifier" | nindent 6 }}
+{{- end }}
+---
+{{- if .Values.temporalWorker.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "house-helper.fullname" . }}-temporal-worker
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "temporal-worker" | nindent 4 }}
+spec:
+  {{- if .Values.temporalWorker.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.temporalWorker.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.temporalWorker.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.temporalWorker.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "house-helper.selectorLabels" . | nindent 6 }}
+      {{- include "house-helper.componentLabels" "temporal-worker" | nindent 6 }}
+{{- end }}
+---
+{{- if .Values.temporalApi.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "house-helper.fullname" . }}-temporal-api
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "temporal-api" | nindent 4 }}
+spec:
+  {{- if .Values.temporalApi.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.temporalApi.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.temporalApi.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.temporalApi.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "house-helper.selectorLabels" . | nindent 6 }}
+      {{- include "house-helper.componentLabels" "temporal-api" | nindent 6 }}
+{{- end }}
+---
+{{- if .Values.kafkaConsumer.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "house-helper.fullname" . }}-kafka-consumer
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "kafka-consumer" | nindent 4 }}
+spec:
+  {{- if .Values.kafkaConsumer.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.kafkaConsumer.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.kafkaConsumer.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.kafkaConsumer.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "house-helper.selectorLabels" . | nindent 6 }}
+      {{- include "house-helper.componentLabels" "kafka-consumer" | nindent 6 }}
+{{- end }}

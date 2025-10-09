@@ -1,0 +1,174 @@
+{{- if .Values.api.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "house-helper.fullname" . }}-api
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "api" | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "house-helper.fullname" . }}-api
+  minReplicas: {{ .Values.api.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.api.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.api.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.api.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.api.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.api.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}
+---
+{{- if .Values.notifier.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "house-helper.fullname" . }}-notifier
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "notifier" | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "house-helper.fullname" . }}-notifier
+  minReplicas: {{ .Values.notifier.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.notifier.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.notifier.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.notifier.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.notifier.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.notifier.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}
+---
+{{- if .Values.temporalWorker.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "house-helper.fullname" . }}-temporal-worker
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "temporal-worker" | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "house-helper.fullname" . }}-temporal-worker
+  minReplicas: {{ .Values.temporalWorker.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.temporalWorker.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.temporalWorker.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.temporalWorker.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.temporalWorker.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.temporalWorker.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}
+---
+{{- if .Values.temporalApi.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "house-helper.fullname" . }}-temporal-api
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "temporal-api" | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "house-helper.fullname" . }}-temporal-api
+  minReplicas: {{ .Values.temporalApi.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.temporalApi.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.temporalApi.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.temporalApi.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.temporalApi.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.temporalApi.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}
+---
+{{- if .Values.kafkaConsumer.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "house-helper.fullname" . }}-kafka-consumer
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "kafka-consumer" | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "house-helper.fullname" . }}-kafka-consumer
+  minReplicas: {{ .Values.kafkaConsumer.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.kafkaConsumer.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.kafkaConsumer.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.kafkaConsumer.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.kafkaConsumer.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.kafkaConsumer.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}

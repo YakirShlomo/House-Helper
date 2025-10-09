@@ -1,0 +1,76 @@
+# Example Terraform Variables Configuration
+# Copy this file to terraform.tfvars and update with your values
+
+# Basic Configuration
+project_name = "house-helper"
+environment  = "dev"
+aws_region   = "us-east-1"
+
+# Networking
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
+
+# EKS Configuration
+eks_cluster_version    = "1.28"
+eks_node_instance_type = "t3.medium"
+eks_node_desired_size  = 2
+eks_node_min_size      = 1
+eks_node_max_size      = 10
+eks_disk_size          = 100
+
+# RDS Configuration
+rds_instance_class          = "db.t3.medium"
+rds_allocated_storage       = 100
+rds_max_allocated_storage   = 500
+rds_backup_retention_period = 7
+rds_enable_read_replica     = false
+rds_max_connections         = 100
+rds_connection_timeout      = 5
+rds_connection_pool_size    = 20
+
+# ElastiCache Configuration
+elasticache_node_type       = "cache.t3.medium"
+elasticache_num_cache_nodes = 2
+
+# MSK Configuration
+msk_kafka_version          = "3.6.0"
+msk_instance_type          = "kafka.t3.small"
+msk_number_of_broker_nodes = 3
+msk_ebs_volume_size        = 100
+
+# Monitoring
+cloudwatch_log_retention_days = 30
+alert_email                   = ""  # Add your email for alerts
+
+# Application Configuration
+app_log_level           = "info"
+max_upload_size_mb      = 50
+session_timeout_minutes = 30
+
+# S3 Configuration
+s3_bucket_size_alert_threshold = 107374182400  # 100 GB
+
+# ECR Configuration
+enable_ecr_pull_through_cache = true
+
+# GitHub Actions (optional)
+enable_github_actions_oidc = false
+github_org                 = ""
+github_repo                = "House-Helper"
+
+# Application Secrets (set via environment variables or AWS Secrets Manager)
+# firebase_server_key       = ""
+# expo_push_token_secret    = ""
+# google_oauth_client_id    = ""
+# google_oauth_secret       = ""
+
+# External Services (set via environment variables or AWS Secrets Manager)
+# twilio_account_sid   = ""
+# twilio_auth_token    = ""
+# twilio_phone_number  = ""
+# sendgrid_api_key     = ""
+# sentry_dsn           = ""
+# datadog_api_key      = ""
+
+# Secrets Rotation
+# secrets_rotation_lambda_arn = ""

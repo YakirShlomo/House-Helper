@@ -1,0 +1,364 @@
+groups:
+- name: api_alerts
+  interval: 30s
+  rules:
+  # High error rate
+  - alert: HighErrorRate
+    expr: |
+      (
+        sum(rate(http_requests_total{status=~"5..",namespace="house-helper-prod"}[5m])) by (service)
+        /
+        sum(rate(http_requests_total{namespace="house-helper-prod"}[5m])) by (service)
+      ) > 0.05
+    for: 5m
+    labels:
+      severity: critical
+      component: api
+    annotations:
+      summary: "High error rate on {{ $labels.service }}"
+      description: "Error rate is {{ $value | humanizePercentage }} for service {{ $labels.service }}"
+      runbook_url: "https://wiki.house-helper.com/runbooks/high-error-rate"
+
+  # High response time
+  - alert: HighResponseTime
+    expr: |
+      histogram_quantile(0.95,
+        sum(rate(http_request_duration_seconds_bucket{namespace="house-helper-prod"}[5m])) by (le, service)
+      ) > 1
+    for: 10m
+    labels:
+      severity: warning
+      component: api
+    annotations:
+      summary: "High response time on {{ $labels.service }}"
+      description: "P95 response time is {{ $value }}s for service {{ $labels.service }}"
+      runbook_url: "https://wiki.house-helper.com/runbooks/high-response-time"
+
+  # Low request rate (possible outage)
+  - alert: LowRequestRate
+    expr: |
+      sum(rate(http_requests_total{namespace="house-helper-prod"}[5m])) by (service) < 1
+    for: 10m
+    labels:
+      severity: warning
+      component: api
+    annotations:
+      summary: "Low request rate on {{ $labels.service }}"
+      description: "Request rate is {{ $value }} req/s for service {{ $labels.service }}, which may indicate an outage"
+      runbook_url: "https://wiki.house-helper.com/runbooks/low-request-rate"
+
+  # API endpoint slow
+  - alert: SlowAPIEndpoint
+    expr: |
+      histogram_quantile(0.99,
+        sum(rate(http_request_duration_seconds_bucket{namespace="house-helper-prod"}[5m])) by (le, endpoint)
+      ) > 2
+    for: 5m
+    labels:
+      severity: warning
+      component: api
+    annotations:
+      summary: "Slow API endpoint {{ $labels.endpoint }}"
+      description: "P99 response time is {{ $value }}s for endpoint {{ $labels.endpoint }}"
+      runbook_url: "https://wiki.house-helper.com/runbooks/slow-endpoint"
+
+- name: infrastructure_alerts
+  interval: 30s
+  rules:
+  # High CPU usage
+  - alert: HighCPUUsage
+    expr: |
+      (
+        sum(rate(container_cpu_usage_seconds_total{namespace="house-helper-prod",container!=""}[5m])) by (pod)
+        /
+        sum(container_spec_cpu_quota{namespace="house-helper-prod",container!=""}/container_spec_cpu_period{namespace="house-helper-prod",container!=""}) by (pod)
+      ) > 0.8
+    for: 10m
+    labels:
+      severity: warning
+      component: infrastructure
+    annotations:
+      summary: "High CPU usage on {{ $labels.pod }}"
+      description: "CPU usage is {{ $value | humanizePercentage }} on pod {{ $labels.pod }}"
+      runbook_url: "https://wiki.house-helper.com/runbooks/high-cpu-usage"
+
+  # High memory usage
+  - alert: HighMemoryUsage
+    expr: |
+      (
+        sum(container_memory_working_set_bytes{namespace="house-helper-prod",container!=""}) by (pod)
+        /
+        sum(container_spec_memory_limit_bytes{namespace="house-helper-prod",container!=""}) by (pod)
+      ) > 0.9
+    for: 5m
+    labels:
+      severity: critical
+      component: infrastructure
+    annotations:
+      summary: "High memory usage on {{ $labels.pod }}"
+      description: "Memory usage is {{ $value | humanizePercentage }} on pod {{ $labels.pod }}"
+      runbook_url: "https://wiki.house-helper.com/runbooks/high-memory-usage"
+
+  # Pod restart loop
+  - alert: PodRestartLoop
+    expr: |
+      rate(kube_pod_container_status_restarts_total{namespace="house-helper-prod"}[15m]) > 0
+    for: 5m
+    labels:
+      severity: critical
+      component: infrastructure
+    annotations:
+      summary: "Pod {{ $labels.pod }} is restart looping"
+      description: "Pod {{ $labels.pod }} has restarted {{ $value }} times in the last 15 minutes"
+      runbook_url: "https://wiki.house-helper.com/runbooks/pod-restart-loop"
+
+  # Pod not ready
+  - alert: PodNotReady
+    expr: |
+      sum(kube_pod_status_phase{namespace="house-helper-prod",phase!="Running"}) by (pod) > 0
+    for: 10m
+    labels:
+      severity: warning
+      component: infrastructure
+    annotations:
+      summary: "Pod {{ $labels.pod }} is not ready"
+      description: "Pod {{ $labels.pod }} has been in non-running state for more than 10 minutes"
+      runbook_url: "https://wiki.house-helper.com/runbooks/pod-not-ready"
+
+  # Node disk pressure
+  - alert: NodeDiskPressure
+    expr: |
+      kube_node_status_condition{condition="DiskPressure",status="true"} == 1
+    for: 5m
+    labels:
+      severity: critical
+      component: infrastructure
+    annotations:
+      summary: "Node {{ $labels.node }} has disk pressure"
+      description: "Node {{ $labels.node }} is experiencing disk pressure"
+      runbook_url: "https://wiki.house-helper.com/runbooks/node-disk-pressure"
+
+- name: database_alerts
+  interval: 30s
+  rules:
+  # High database connection usage
+  - alert: HighDatabaseConnections
+    expr: |
+      (
+        sum(pg_stat_database_numbackends{namespace="house-helper-prod"}) by (datname)
+        /
+        sum(pg_settings_max_connections{namespace="house-helper-prod"})
+      ) > 0.8
+    for: 5m
+    labels:
+      severity: warning
+      component: database
+    annotations:
+      summary: "High database connections on {{ $labels.datname }}"
+      description: "Database connection usage is {{ $value | humanizePercentage }}"
+      runbook_url: "https://wiki.house-helper.com/runbooks/high-db-connections"
+
+  # Slow queries
+  - alert: SlowQueries
+    expr: |
+      rate(pg_stat_statements_mean_exec_time{namespace="house-helper-prod"}[5m]) > 1000
+    for: 10m
+    labels:
+      severity: warning
+      component: database
+    annotations:
+      summary: "Slow queries detected"
+      description: "Average query execution time is {{ $value }}ms"
+      runbook_url: "https://wiki.house-helper.com/runbooks/slow-queries"
+
+  # Database down
+  - alert: DatabaseDown
+    expr: |
+      pg_up{namespace="house-helper-prod"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      component: database
+    annotations:
+      summary: "Database is down"
+      description: "PostgreSQL database is not responding"
+      runbook_url: "https://wiki.house-helper.com/runbooks/database-down"
+
+  # Low cache hit ratio
+  - alert: LowCacheHitRatio
+    expr: |
+      (
+        sum(pg_stat_database_blks_hit{namespace="house-helper-prod"}) by (datname)
+        /
+        (
+          sum(pg_stat_database_blks_hit{namespace="house-helper-prod"}) by (datname)
+          +
+          sum(pg_stat_database_blks_read{namespace="house-helper-prod"}) by (datname)
+        )
+      ) < 0.9
+    for: 10m
+    labels:
+      severity: warning
+      component: database
+    annotations:
+      summary: "Low cache hit ratio on {{ $labels.datname }}"
+      description: "Cache hit ratio is {{ $value | humanizePercentage }}, consider increasing shared_buffers"
+      runbook_url: "https://wiki.house-helper.com/runbooks/low-cache-hit-ratio"
+
+  # Database disk usage
+  - alert: HighDatabaseDiskUsage
+    expr: |
+      (
+        pg_database_size_bytes{namespace="house-helper-prod"}
+        /
+        node_filesystem_size_bytes{namespace="house-helper-prod",mountpoint="/data"}
+      ) > 0.8
+    for: 5m
+    labels:
+      severity: warning
+      component: database
+    annotations:
+      summary: "High database disk usage"
+      description: "Database disk usage is {{ $value | humanizePercentage }}"
+      runbook_url: "https://wiki.house-helper.com/runbooks/high-db-disk-usage"
+
+- name: security_alerts
+  interval: 30s
+  rules:
+  # High failed login rate
+  - alert: HighFailedLoginRate
+    expr: |
+      rate(failed_login_attempts_total{namespace="house-helper-prod"}[5m]) > 10
+    for: 5m
+    labels:
+      severity: warning
+      component: security
+    annotations:
+      summary: "High failed login rate"
+      description: "Failed login rate is {{ $value }} attempts/s"
+      runbook_url: "https://wiki.house-helper.com/runbooks/high-failed-login-rate"
+
+  # Unauthorized access attempts
+  - alert: UnauthorizedAccessAttempts
+    expr: |
+      rate(http_requests_total{status="401",namespace="house-helper-prod"}[5m]) > 5
+    for: 1m
+    labels:
+      severity: critical
+      component: security
+    annotations:
+      summary: "Unauthorized access attempts detected"
+      description: "Unauthorized access rate is {{ $value }} attempts/s"
+      runbook_url: "https://wiki.house-helper.com/runbooks/unauthorized-access"
+
+  # Anomalous data access
+  - alert: AnomalousDataAccess
+    expr: |
+      rate(data_access_total{namespace="house-helper-prod"}[5m])
+      >
+      avg_over_time(data_access_total{namespace="house-helper-prod"}[1h]) * 3
+    for: 10m
+    labels:
+      severity: warning
+      component: security
+    annotations:
+      summary: "Anomalous data access pattern detected"
+      description: "Data access rate is 3x higher than normal"
+      runbook_url: "https://wiki.house-helper.com/runbooks/anomalous-data-access"
+
+- name: business_alerts
+  interval: 1m
+  rules:
+  # No tasks created (user engagement issue)
+  - alert: NoTasksCreated
+    expr: |
+      sum(increase(tasks_created_total{namespace="house-helper-prod"}[1h])) == 0
+    for: 2h
+    labels:
+      severity: warning
+      component: business
+    annotations:
+      summary: "No tasks created in the last hour"
+      description: "No tasks have been created in the last hour, which may indicate a problem"
+      runbook_url: "https://wiki.house-helper.com/runbooks/no-tasks-created"
+
+  # High task failure rate
+  - alert: HighTaskFailureRate
+    expr: |
+      (
+        sum(rate(tasks_failed_total{namespace="house-helper-prod"}[5m]))
+        /
+        sum(rate(tasks_total{namespace="house-helper-prod"}[5m]))
+      ) > 0.1
+    for: 10m
+    labels:
+      severity: warning
+      component: business
+    annotations:
+      summary: "High task failure rate"
+      description: "Task failure rate is {{ $value | humanizePercentage }}"
+      runbook_url: "https://wiki.house-helper.com/runbooks/high-task-failure-rate"
+
+- name: slo_alerts
+  interval: 1m
+  rules:
+  # API availability SLO
+  - alert: APIAvailabilitySLOBreach
+    expr: |
+      (
+        sum(rate(http_requests_total{status!~"5..",namespace="house-helper-prod"}[30d]))
+        /
+        sum(rate(http_requests_total{namespace="house-helper-prod"}[30d]))
+      ) < 0.999
+    for: 5m
+    labels:
+      severity: critical
+      component: slo
+    annotations:
+      summary: "API availability SLO breach"
+      description: "API availability is {{ $value | humanizePercentage }}, below 99.9% SLO"
+      runbook_url: "https://wiki.house-helper.com/runbooks/slo-breach"
+
+  # API latency SLO
+  - alert: APILatencySLOBreach
+    expr: |
+      histogram_quantile(0.95,
+        sum(rate(http_request_duration_seconds_bucket{namespace="house-helper-prod"}[5m])) by (le)
+      ) > 0.5
+    for: 10m
+    labels:
+      severity: warning
+      component: slo
+    annotations:
+      summary: "API latency SLO breach"
+      description: "P95 latency is {{ $value }}s, above 500ms SLO"
+      runbook_url: "https://wiki.house-helper.com/runbooks/slo-breach"
+
+- name: kafka_alerts
+  interval: 30s
+  rules:
+  # High consumer lag
+  - alert: HighKafkaConsumerLag
+    expr: |
+      sum(kafka_consumer_lag{namespace="house-helper-prod"}) by (topic, consumer_group) > 1000
+    for: 10m
+    labels:
+      severity: warning
+      component: kafka
+    annotations:
+      summary: "High Kafka consumer lag on {{ $labels.topic }}"
+      description: "Consumer group {{ $labels.consumer_group }} has {{ $value }} messages lag on topic {{ $labels.topic }}"
+      runbook_url: "https://wiki.house-helper.com/runbooks/high-consumer-lag"
+
+  # Kafka broker down
+  - alert: KafkaBrokerDown
+    expr: |
+      kafka_broker_info{namespace="house-helper-prod"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      component: kafka
+    annotations:
+      summary: "Kafka broker {{ $labels.broker }} is down"
+      description: "Kafka broker {{ $labels.broker }} is not responding"
+      runbook_url: "https://wiki.house-helper.com/runbooks/kafka-broker-down"

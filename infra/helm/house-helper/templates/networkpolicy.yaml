@@ -1,0 +1,129 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "house-helper.fullname" . }}-api
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "api" | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "house-helper.selectorLabels" . | nindent 6 }}
+      {{- include "house-helper.componentLabels" "api" | nindent 6 }}
+  policyTypes:
+    {{- toYaml .Values.networkPolicy.policyTypes | nindent 4 }}
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: {{ include "house-helper.namespace" . }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: aws-load-balancer-controller
+      ports:
+        - protocol: TCP
+          port: {{ .Values.api.service.targetPort }}
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow RDS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow Redis
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow Kafka
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 9094
+        - protocol: TCP
+          port: 9096
+    # Allow HTTPS for external APIs
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "house-helper.fullname" . }}-notifier
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "notifier" | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "house-helper.selectorLabels" . | nindent 6 }}
+      {{- include "house-helper.componentLabels" "notifier" | nindent 6 }}
+  policyTypes:
+    {{- toYaml .Values.networkPolicy.policyTypes | nindent 4 }}
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: {{ include "house-helper.namespace" . }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: aws-load-balancer-controller
+      ports:
+        - protocol: TCP
+          port: {{ .Values.notifier.service.targetPort }}
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow Redis
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow Kafka
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 9094
+        - protocol: TCP
+          port: 9096
+    # Allow HTTPS for push notifications
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+{{- end }}

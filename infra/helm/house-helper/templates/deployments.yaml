@@ -1,0 +1,293 @@
+{{- if .Values.notifier.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "house-helper.fullname" . }}-notifier
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "notifier" | nindent 4 }}
+spec:
+  {{- if not .Values.notifier.autoscaling.enabled }}
+  replicas: {{ .Values.notifier.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "house-helper.selectorLabels" . | nindent 6 }}
+      {{- include "house-helper.componentLabels" "notifier" | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- include "house-helper.podAnnotations" (dict "port" .Values.notifier.service.port) | nindent 8 }}
+      labels:
+        {{- include "house-helper.selectorLabels" . | nindent 8 }}
+        {{- include "house-helper.componentLabels" "notifier" | nindent 8 }}
+    spec:
+      {{- include "house-helper.podSecurityContext" . | nindent 6 }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "house-helper.serviceAccountName" . }}
+      containers:
+        - name: notifier
+          {{- include "house-helper.securityContext" . | nindent 10 }}
+          image: {{ include "house-helper.image" (dict "registry" .Values.global.imageRegistry "repository" .Values.notifier.image.repository "tag" .Values.notifier.image.tag) }}
+          imagePullPolicy: {{ .Values.notifier.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.notifier.service.targetPort }}
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          envFrom:
+            {{- include "house-helper.envFromSecrets" . | nindent 12 }}
+          env:
+            {{- include "house-helper.commonEnv" . | nindent 12 }}
+            {{- range $key, $value := .Values.notifier.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: REDIS_URL
+              value: {{ include "house-helper.redisConnectionString" . | quote }}
+            - name: KAFKA_BROKERS
+              value: {{ include "house-helper.kafkaBootstrapServers" . | quote }}
+          {{- with .Values.notifier.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.notifier.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- include "house-helper.resources" .Values.notifier | nindent 10 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "house-helper.fullname" . }}-config
+        - name: tmp
+          emptyDir: {}
+{{- end }}
+---
+{{- if .Values.temporalWorker.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "house-helper.fullname" . }}-temporal-worker
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "temporal-worker" | nindent 4 }}
+spec:
+  {{- if not .Values.temporalWorker.autoscaling.enabled }}
+  replicas: {{ .Values.temporalWorker.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "house-helper.selectorLabels" . | nindent 6 }}
+      {{- include "house-helper.componentLabels" "temporal-worker" | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "house-helper.selectorLabels" . | nindent 8 }}
+        {{- include "house-helper.componentLabels" "temporal-worker" | nindent 8 }}
+    spec:
+      {{- include "house-helper.podSecurityContext" . | nindent 6 }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "house-helper.serviceAccountName" . }}
+      containers:
+        - name: temporal-worker
+          {{- include "house-helper.securityContext" . | nindent 10 }}
+          image: {{ include "house-helper.image" (dict "registry" .Values.global.imageRegistry "repository" .Values.temporalWorker.image.repository "tag" .Values.temporalWorker.image.tag) }}
+          imagePullPolicy: {{ .Values.temporalWorker.image.pullPolicy }}
+          ports:
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          envFrom:
+            {{- include "house-helper.envFromSecrets" . | nindent 12 }}
+          env:
+            {{- include "house-helper.commonEnv" . | nindent 12 }}
+            {{- range $key, $value := .Values.temporalWorker.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: DB_CONNECTION_STRING
+              value: {{ include "house-helper.dbConnectionString" . | quote }}
+            - name: REDIS_URL
+              value: {{ include "house-helper.redisConnectionString" . | quote }}
+          {{- include "house-helper.resources" .Values.temporalWorker | nindent 10 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "house-helper.fullname" . }}-config
+        - name: tmp
+          emptyDir: {}
+{{- end }}
+---
+{{- if .Values.temporalApi.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "house-helper.fullname" . }}-temporal-api
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "temporal-api" | nindent 4 }}
+spec:
+  {{- if not .Values.temporalApi.autoscaling.enabled }}
+  replicas: {{ .Values.temporalApi.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "house-helper.selectorLabels" . | nindent 6 }}
+      {{- include "house-helper.componentLabels" "temporal-api" | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- include "house-helper.podAnnotations" (dict "port" .Values.temporalApi.service.port) | nindent 8 }}
+      labels:
+        {{- include "house-helper.selectorLabels" . | nindent 8 }}
+        {{- include "house-helper.componentLabels" "temporal-api" | nindent 8 }}
+    spec:
+      {{- include "house-helper.podSecurityContext" . | nindent 6 }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "house-helper.serviceAccountName" . }}
+      containers:
+        - name: temporal-api
+          {{- include "house-helper.securityContext" . | nindent 10 }}
+          image: {{ include "house-helper.image" (dict "registry" .Values.global.imageRegistry "repository" .Values.temporalApi.image.repository "tag" .Values.temporalApi.image.tag) }}
+          imagePullPolicy: {{ .Values.temporalApi.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.temporalApi.service.targetPort }}
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          envFrom:
+            {{- include "house-helper.envFromSecrets" . | nindent 12 }}
+          env:
+            {{- include "house-helper.commonEnv" . | nindent 12 }}
+            {{- range $key, $value := .Values.temporalApi.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- with .Values.temporalApi.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.temporalApi.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- include "house-helper.resources" .Values.temporalApi | nindent 10 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "house-helper.fullname" . }}-config
+        - name: tmp
+          emptyDir: {}
+{{- end }}
+---
+{{- if .Values.kafkaConsumer.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "house-helper.fullname" . }}-kafka-consumer
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "kafka-consumer" | nindent 4 }}
+spec:
+  {{- if not .Values.kafkaConsumer.autoscaling.enabled }}
+  replicas: {{ .Values.kafkaConsumer.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "house-helper.selectorLabels" . | nindent 6 }}
+      {{- include "house-helper.componentLabels" "kafka-consumer" | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "house-helper.selectorLabels" . | nindent 8 }}
+        {{- include "house-helper.componentLabels" "kafka-consumer" | nindent 8 }}
+    spec:
+      {{- include "house-helper.podSecurityContext" . | nindent 6 }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "house-helper.serviceAccountName" . }}
+      containers:
+        - name: kafka-consumer
+          {{- include "house-helper.securityContext" . | nindent 10 }}
+          image: {{ include "house-helper.image" (dict "registry" .Values.global.imageRegistry "repository" .Values.kafkaConsumer.image.repository "tag" .Values.kafkaConsumer.image.tag) }}
+          imagePullPolicy: {{ .Values.kafkaConsumer.image.pullPolicy }}
+          ports:
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          envFrom:
+            {{- include "house-helper.envFromSecrets" . | nindent 12 }}
+          env:
+            {{- include "house-helper.commonEnv" . | nindent 12 }}
+            {{- range $key, $value := .Values.kafkaConsumer.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: DB_CONNECTION_STRING
+              value: {{ include "house-helper.dbConnectionString" . | quote }}
+            - name: REDIS_URL
+              value: {{ include "house-helper.redisConnectionString" . | quote }}
+            - name: KAFKA_BROKERS
+              value: {{ include "house-helper.kafkaBootstrapServers" . | quote }}
+          {{- include "house-helper.resources" .Values.kafkaConsumer | nindent 10 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "house-helper.fullname" . }}-config
+        - name: tmp
+          emptyDir: {}
+{{- end }}

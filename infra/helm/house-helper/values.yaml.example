@@ -1,0 +1,29 @@
+# Default values are commented out.
+# Uncomment and customize as needed.
+
+# environment: dev
+# 
+# global:
+#   projectName: house-helper
+#   environment: dev
+#   domain: dev.househelper.app
+# 
+# api:
+#   image:
+#     tag: v1.0.0
+# 
+# notifier:
+#   image:
+#     tag: v1.0.0
+# 
+# temporalWorker:
+#   image:
+#     tag: v1.0.0
+# 
+# temporalApi:
+#   image:
+#     tag: v1.0.0
+# 
+# kafkaConsumer:
+#   image:
+#     tag: v1.0.0

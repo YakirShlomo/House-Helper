@@ -1,0 +1,440 @@
+# Global Configuration
+global:
+  projectName: house-helper
+  environment: dev
+  domain: househelper.app
+  
+  # Image Registry
+  imageRegistry: ""
+  imagePullSecrets: []
+  
+  # Storage Class
+  storageClass: "gp3"
+
+# Environment
+environment: dev
+
+# Namespace
+namespaceOverride: ""
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: ""
+  name: app-service-account
+
+# API Service Configuration
+api:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: house-helper/dev/api
+    tag: latest
+    pullPolicy: Always
+  
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+    annotations: {}
+  
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  env:
+    PORT: "8080"
+    LOG_LEVEL: "info"
+    DB_MAX_CONNECTIONS: "100"
+    REDIS_DB: "0"
+  
+  envFrom: []
+  
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 8080
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Notifier Service Configuration
+notifier:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: house-helper/dev/notifier
+    tag: latest
+    pullPolicy: Always
+  
+  service:
+    type: ClusterIP
+    port: 8081
+    targetPort: 8081
+    annotations: {}
+  
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  env:
+    PORT: "8081"
+    LOG_LEVEL: "info"
+    WS_PING_INTERVAL: "30s"
+    WS_MAX_CONNECTIONS: "10000"
+  
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8081
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 8081
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+# Temporal Worker Configuration
+temporalWorker:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: house-helper/dev/temporal-worker
+    tag: latest
+    pullPolicy: Always
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  env:
+    LOG_LEVEL: "info"
+    WORKER_CONCURRENCY: "10"
+    MAX_CONCURRENT_WORKFLOWS: "100"
+  
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+# Temporal API Configuration
+temporalApi:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: house-helper/dev/temporal-api
+    tag: latest
+    pullPolicy: Always
+  
+  service:
+    type: ClusterIP
+    port: 8082
+    targetPort: 8082
+    annotations: {}
+  
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  env:
+    PORT: "8082"
+    LOG_LEVEL: "info"
+  
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8082
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 8082
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+# Kafka Consumer Configuration
+kafkaConsumer:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: house-helper/dev/kafka-consumer
+    tag: latest
+    pullPolicy: Always
+  
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  env:
+    LOG_LEVEL: "info"
+    CONSUMER_GROUP: "house-helper-consumers"
+    MAX_POLL_RECORDS: "500"
+  
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
+    external-dns.alpha.kubernetes.io/hostname: api.househelper.app
+  
+  hosts:
+    - host: api.househelper.app
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service: api
+            port: 8080
+        - path: /ws
+          pathType: Prefix
+          backend:
+            service: notifier
+            port: 8081
+        - path: /temporal
+          pathType: Prefix
+          backend:
+            service: temporal-api
+            port: 8082
+  
+  tls:
+    - secretName: house-helper-tls
+      hosts:
+        - api.househelper.app
+
+# ConfigMap for application configuration
+configMap:
+  create: true
+  data:
+    app.conf: |
+      log_level: info
+      max_upload_size_mb: 50
+      session_timeout_minutes: 30
+      enable_debug: false
+
+# Secrets Configuration (using External Secrets Operator)
+externalSecrets:
+  enabled: true
+  secretStore:
+    name: aws-secrets-manager
+    kind: SecretStore
+  
+  secrets:
+    - name: app-secrets
+      remoteRef: house-helper-dev-app-secrets
+      template:
+        type: Opaque
+    
+    - name: db-credentials
+      remoteRef: house-helper-dev-rds-credentials
+      template:
+        type: Opaque
+    
+    - name: redis-credentials
+      remoteRef: house-helper-dev-redis-auth-token
+      template:
+        type: Opaque
+    
+    - name: kafka-credentials
+      remoteRef: house-helper-dev-msk-credentials
+      template:
+        type: Opaque
+
+# Database Configuration (for local development)
+postgresql:
+  enabled: false
+  auth:
+    username: house_helper
+    password: ""
+    database: house_helper
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+
+# Redis Configuration (for local development)
+redis:
+  enabled: false
+  auth:
+    enabled: true
+    password: ""
+  master:
+    persistence:
+      enabled: true
+      size: 5Gi
+
+# Kafka Configuration (for local development)
+kafka:
+  enabled: false
+  persistence:
+    enabled: true
+    size: 10Gi
+  zookeeper:
+    persistence:
+      enabled: true
+      size: 5Gi
+
+# Network Policies
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Pod Security Policy
+podSecurityPolicy:
+  enabled: true
+
+# Monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+  
+  prometheusRule:
+    enabled: true
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+      
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+
+# Backup Configuration
+backup:
+  enabled: false
+  schedule: "0 2 * * *"
+  s3Bucket: house-helper-dev-backups
+  retention: 7
+
+# Init Containers
+initContainers:
+  dbMigration:
+    enabled: true
+    image:
+      repository: house-helper/dev/api
+      tag: latest
+    command: ["/app/migrate"]

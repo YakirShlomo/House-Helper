@@ -1,0 +1,23 @@
+@YakirShlomo
+@YakirShlomo/house-helper-maintainers
+
+# Global owners
+* @YakirShlomo
+
+# Mobile app
+/apps/mobile_flutter/ @YakirShlomo
+/apps/mobile_flutter/ios/ @YakirShlomo
+/apps/mobile_flutter/android/ @YakirShlomo
+
+# Backend services
+/services/ @YakirShlomo
+
+# Infrastructure
+/infra/ @YakirShlomo
+/deploy/ @YakirShlomo
+
+# CI/CD
+/.github/ @YakirShlomo
+
+# Documentation
+/docs/ @YakirShlomo

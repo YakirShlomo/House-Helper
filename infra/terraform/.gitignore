@@ -1,0 +1,25 @@
+terraform {
+  required_version = ">= 1.6"
+}
+
+# Ignore sensitive files
+*.tfvars
+!terraform.tfvars.example
+!prod.tfvars
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+tfplan
+*.tfplan
+*.zip
+
+# Ignore plan output files
+plan.txt
+plan.json

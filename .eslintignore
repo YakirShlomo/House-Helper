@@ -1,0 +1,10 @@
+# k6 load testing scripts
+tests/load/*.js
+
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.min.js

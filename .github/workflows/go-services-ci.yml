@@ -1,0 +1,243 @@
+name: Go Services CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'services/**'
+      - '.github/workflows/go-services-ci.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/**'
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.21'
+  AWS_REGION: us-east-1
+
+jobs:
+  test:
+    name: Test Go Services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [api, notifier, temporal-worker, temporal-api, kafka-consumer]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: services/${{ matrix.service }}/go.sum
+      
+      - name: Download dependencies
+        working-directory: services/${{ matrix.service }}
+        run: go mod download
+      
+      - name: Run go vet
+        working-directory: services/${{ matrix.service }}
+        run: go vet ./...
+      
+      - name: Run staticcheck
+        uses: dominikh/staticcheck-action@v1
+        with:
+          version: "2023.1.6"
+          install-go: false
+          working-directory: services/${{ matrix.service }}
+      
+      - name: Run tests with coverage
+        working-directory: services/${{ matrix.service }}
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: services/${{ matrix.service }}/coverage.out
+          flags: ${{ matrix.service }}
+          name: ${{ matrix.service }}-coverage
+
+  lint:
+    name: Lint Go Services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [api, notifier, temporal-worker, temporal-api, kafka-consumer]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          working-directory: services/${{ matrix.service }}
+          args: --timeout=5m
+
+  build:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    if: github.event_name == 'push'
+    strategy:
+      matrix:
+        service: [api, notifier, temporal-worker, temporal-api, kafka-consumer]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/house-helper/${{ github.ref_name == 'main' && 'prod' || 'dev' }}/${{ matrix.service }}
+          tags: |
+            type=sha,prefix={{branch}}-
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: services/${{ matrix.service }}
+          file: services/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+      
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/house-helper/${{ github.ref_name == 'main' && 'prod' || 'dev' }}/${{ matrix.service }}:latest
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.service }}.sarif'
+      
+      - name: Upload Trivy scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+          category: ${{ matrix.service }}
+
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    environment:
+      name: development
+      url: https://dev.househelper.app
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name house-helper-dev --region ${{ env.AWS_REGION }}
+      
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: '3.13.0'
+      
+      - name: Deploy to Kubernetes
+        run: |
+          helm upgrade --install house-helper infra/helm/house-helper \
+            --namespace house-helper-dev \
+            --create-namespace \
+            --set environment=dev \
+            --set api.image.tag=${{ github.sha }} \
+            --set notifier.image.tag=${{ github.sha }} \
+            --set temporalWorker.image.tag=${{ github.sha }} \
+            --set temporalApi.image.tag=${{ github.sha }} \
+            --set kafkaConsumer.image.tag=${{ github.sha }} \
+            --wait \
+            --timeout 10m
+
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://api.househelper.app
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name house-helper-prod --region ${{ env.AWS_REGION }}
+      
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: '3.13.0'
+      
+      - name: Deploy to Kubernetes
+        run: |
+          helm upgrade --install house-helper infra/helm/house-helper \
+            --namespace house-helper-prod \
+            --create-namespace \
+            --values infra/helm/house-helper/values-prod.yaml \
+            --set api.image.tag=${{ github.sha }} \
+            --set notifier.image.tag=${{ github.sha }} \
+            --set temporalWorker.image.tag=${{ github.sha }} \
+            --set temporalApi.image.tag=${{ github.sha }} \
+            --set kafkaConsumer.image.tag=${{ github.sha }} \
+            --wait \
+            --timeout 15m
+      
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/house-helper-api -n house-helper-prod
+          kubectl rollout status deployment/house-helper-notifier -n house-helper-prod
+          kubectl rollout status deployment/house-helper-temporal-worker -n house-helper-prod
+          kubectl rollout status deployment/house-helper-temporal-api -n house-helper-prod
+          kubectl rollout status deployment/house-helper-kafka-consumer -n house-helper-prod

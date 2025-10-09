@@ -1,0 +1,20 @@
+-- Drop performance indexes
+DROP INDEX CONCURRENTLY IF EXISTS idx_bills_category_status_due;
+DROP INDEX CONCURRENTLY IF EXISTS idx_tasks_category_priority_status;
+DROP INDEX CONCURRENTLY IF EXISTS idx_products_brand_category;
+DROP INDEX CONCURRENTLY IF EXISTS idx_products_name_trgm;
+DROP INDEX CONCURRENTLY IF EXISTS idx_household_invitations_pending;
+DROP INDEX CONCURRENTLY IF EXISTS idx_timers_active;
+DROP INDEX CONCURRENTLY IF EXISTS idx_timers_household_status;
+DROP INDEX CONCURRENTLY IF EXISTS idx_bills_overdue;
+DROP INDEX CONCURRENTLY IF EXISTS idx_bills_upcoming;
+DROP INDEX CONCURRENTLY IF EXISTS idx_bills_household_status_due;
+DROP INDEX CONCURRENTLY IF EXISTS idx_shopping_items_category_purchased;
+DROP INDEX CONCURRENTLY IF EXISTS idx_shopping_items_list_purchased;
+DROP INDEX CONCURRENTLY IF EXISTS idx_tasks_overdue;
+DROP INDEX CONCURRENTLY IF EXISTS idx_tasks_assigned_status_due;
+DROP INDEX CONCURRENTLY IF EXISTS idx_tasks_household_status_priority;
+DROP INDEX CONCURRENTLY IF EXISTS idx_household_members_user_active;
+DROP INDEX CONCURRENTLY IF EXISTS idx_household_members_active;
+DROP INDEX CONCURRENTLY IF EXISTS idx_users_phone_verified;
+DROP INDEX CONCURRENTLY IF EXISTS idx_users_email_verified;

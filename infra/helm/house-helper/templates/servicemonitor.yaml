@@ -1,0 +1,82 @@
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "house-helper.fullname" . }}-api
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "api" | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "house-helper.selectorLabels" . | nindent 6 }}
+      {{- include "house-helper.componentLabels" "api" | nindent 6 }}
+  endpoints:
+    - port: metrics
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout }}
+      path: /metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "house-helper.fullname" . }}-notifier
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "notifier" | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "house-helper.selectorLabels" . | nindent 6 }}
+      {{- include "house-helper.componentLabels" "notifier" | nindent 6 }}
+  endpoints:
+    - port: metrics
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout }}
+      path: /metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "house-helper.fullname" . }}-temporal-api
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "temporal-api" | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "house-helper.selectorLabels" . | nindent 6 }}
+      {{- include "house-helper.componentLabels" "temporal-api" | nindent 6 }}
+  endpoints:
+    - port: metrics
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout }}
+      path: /metrics
+{{- end }}
+---
+{{- if .Values.monitoring.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "house-helper.fullname" . }}
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: house-helper
+      interval: 30s
+      rules:
+        {{- range .Values.monitoring.prometheusRule.rules }}
+        - alert: {{ .alert }}
+          expr: {{ .expr }}
+          for: {{ .for }}
+          labels:
+            {{- toYaml .labels | nindent 12 }}
+          annotations:
+            {{- toYaml .annotations | nindent 12 }}
+        {{- end }}
+{{- end }}

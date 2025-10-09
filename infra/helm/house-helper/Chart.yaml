@@ -1,0 +1,38 @@
+apiVersion: v2
+name: house-helper
+description: A Helm chart for House Helper application
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.24.0-0"
+
+keywords:
+  - house-helper
+  - household-management
+  - task-management
+  - family-calendar
+
+maintainers:
+  - name: House Helper Team
+    email: team@househelper.app
+
+dependencies:
+  - name: postgresql
+    version: "12.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  
+  - name: redis
+    version: "18.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  
+  - name: kafka
+    version: "26.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: kafka.enabled
+
+  - name: external-secrets
+    version: "0.9.x"
+    repository: https://charts.external-secrets.io
+    condition: externalSecrets.enabled

@@ -1,0 +1,74 @@
+{{- if .Values.api.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "house-helper.fullname" . }}-api
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "api" | nindent 4 }}
+  {{- with .Values.api.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.api.service.type }}
+  ports:
+    - port: {{ .Values.api.service.port }}
+      targetPort: {{ .Values.api.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "house-helper.selectorLabels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "api" | nindent 4 }}
+{{- end }}
+---
+{{- if .Values.notifier.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "house-helper.fullname" . }}-notifier
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "notifier" | nindent 4 }}
+  {{- with .Values.notifier.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.notifier.service.type }}
+  ports:
+    - port: {{ .Values.notifier.service.port }}
+      targetPort: {{ .Values.notifier.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "house-helper.selectorLabels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "notifier" | nindent 4 }}
+{{- end }}
+---
+{{- if .Values.temporalApi.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "house-helper.fullname" . }}-temporal-api
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "temporal-api" | nindent 4 }}
+  {{- with .Values.temporalApi.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.temporalApi.service.type }}
+  ports:
+    - port: {{ .Values.temporalApi.service.port }}
+      targetPort: {{ .Values.temporalApi.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "house-helper.selectorLabels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "temporal-api" | nindent 4 }}
+{{- end }}

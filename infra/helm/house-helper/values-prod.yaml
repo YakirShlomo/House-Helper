@@ -1,0 +1,306 @@
+# Production values for House Helper
+environment: prod
+
+global:
+  projectName: house-helper
+  environment: prod
+  domain: househelper.app
+  awsRegion: us-east-1
+
+# Service Account with IRSA
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/house-helper-prod-app-pods"
+  name: app-service-account
+
+# API Service - Production Sizing
+api:
+  enabled: true
+  replicaCount: 4
+  
+  image:
+    repository: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/house-helper/prod/api
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 4
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  env:
+    PORT: "8080"
+    LOG_LEVEL: "warn"
+    DB_MAX_CONNECTIONS: "500"
+    REDIS_DB: "0"
+
+# Notifier Service - Production Sizing
+notifier:
+  enabled: true
+  replicaCount: 4
+  
+  image:
+    repository: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/house-helper/prod/notifier
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 4
+    maxReplicas: 20
+  
+  env:
+    PORT: "8081"
+    LOG_LEVEL: "warn"
+    WS_PING_INTERVAL: "30s"
+    WS_MAX_CONNECTIONS: "50000"
+
+# Temporal Worker - Production Sizing
+temporalWorker:
+  enabled: true
+  replicaCount: 4
+  
+  image:
+    repository: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/house-helper/prod/temporal-worker
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 4000m
+      memory: 4Gi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 4
+    maxReplicas: 10
+  
+  env:
+    LOG_LEVEL: "warn"
+    WORKER_CONCURRENCY: "20"
+    MAX_CONCURRENT_WORKFLOWS: "200"
+
+# Temporal API - Production Sizing
+temporalApi:
+  enabled: true
+  replicaCount: 4
+  
+  image:
+    repository: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/house-helper/prod/temporal-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 4
+    maxReplicas: 20
+  
+  env:
+    PORT: "8082"
+    LOG_LEVEL: "warn"
+
+# Kafka Consumer - Production Sizing
+kafkaConsumer:
+  enabled: true
+  replicaCount: 4
+  
+  image:
+    repository: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/house-helper/prod/kafka-consumer
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 4
+    maxReplicas: 20
+  
+  env:
+    LOG_LEVEL: "warn"
+    CONSUMER_GROUP: "house-helper-prod-consumers"
+    MAX_POLL_RECORDS: "1000"
+
+# Ingress with ACM Certificate
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/CERT_ID"
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/success-codes: "200"
+    external-dns.alpha.kubernetes.io/hostname: api.househelper.app
+    alb.ingress.kubernetes.io/tags: Environment=prod,Project=house-helper
+  
+  hosts:
+    - host: api.househelper.app
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service: api
+            port: 8080
+        - path: /ws
+          pathType: Prefix
+          backend:
+            service: notifier
+            port: 8081
+        - path: /temporal
+          pathType: Prefix
+          backend:
+            service: temporal-api
+            port: 8082
+  
+  tls:
+    - secretName: house-helper-tls
+      hosts:
+        - api.househelper.app
+
+# External Secrets for AWS Secrets Manager
+externalSecrets:
+  enabled: true
+  secretStore:
+    name: aws-secrets-manager
+    kind: SecretStore
+  
+  secrets:
+    - name: app-secrets
+      remoteRef: house-helper-prod-app-secrets
+      template:
+        type: Opaque
+    
+    - name: db-credentials
+      remoteRef: house-helper-prod-rds-credentials
+      template:
+        type: Opaque
+    
+    - name: redis-credentials
+      remoteRef: house-helper-prod-redis-auth-token
+      template:
+        type: Opaque
+    
+    - name: kafka-credentials
+      remoteRef: house-helper-prod-msk-credentials
+      template:
+        type: Opaque
+
+# Disable embedded services in production
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+kafka:
+  enabled: false
+
+# Network Policies
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Pod Security Policy
+podSecurityPolicy:
+  enabled: true
+
+# Monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+  
+  prometheusRule:
+    enabled: true
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected in production"
+          description: "Error rate is {{ $value }} requests/second"
+      
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+      
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value | humanizePercentage }}"
+      
+      - alert: PodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod is crash looping"
+          description: "Pod {{ $labels.pod }} is crash looping"
+
+# Init Containers
+initContainers:
+  dbMigration:
+    enabled: true
+    image:
+      repository: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/house-helper/prod/api
+      tag: latest
+    command: ["/app/migrate"]

@@ -1,0 +1,113 @@
+# Global patterns
+.DS_Store
+.vscode/
+.idea/
+*.log
+*.tmp
+*.swp
+*.bak
+*~
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+go.work.sum
+vendor/
+bin/
+dist/
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+**/android/app/debug
+**/android/app/profile
+**/android/app/release
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Runner/GeneratedPluginRegistrant.*
+
+# iOS
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.moved-aside
+**/ios/**/*.pbxuser
+**/ios/**/*.perspectivev3
+**/ios/**/DerivedData/
+**/ios/**/*.hmap
+**/ios/**/*.ipa
+**/ios/.symlinks/
+
+# Android
+**/android/**/gradle-wrapper.jar
+**/android/.gradle
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+**/android/key.properties
+*.jks
+
+# Web
+**/web/*.js
+**/web/*.js_
+**/web/*.js.deps
+**/web/*.js.map
+
+# Docker
+.dockerignore
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+terraform.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Helm
+**/charts/*.tgz
+
+# Secrets
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+*.p8
+config.json
+google-services.json
+GoogleService-Info.plist
+
+# Build artifacts
+target/
+*.jar
+*.war
+*.ear
+*.class

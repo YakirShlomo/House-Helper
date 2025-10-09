@@ -1,0 +1,110 @@
+{{- if .Values.api.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "house-helper.fullname" . }}-api
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+    {{- include "house-helper.componentLabels" "api" | nindent 4 }}
+spec:
+  {{- if not .Values.api.autoscaling.enabled }}
+  replicas: {{ .Values.api.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "house-helper.selectorLabels" . | nindent 6 }}
+      {{- include "house-helper.componentLabels" "api" | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- include "house-helper.podAnnotations" (dict "port" .Values.api.service.port) | nindent 8 }}
+      labels:
+        {{- include "house-helper.selectorLabels" . | nindent 8 }}
+        {{- include "house-helper.componentLabels" "api" | nindent 8 }}
+    spec:
+      {{- include "house-helper.podSecurityContext" . | nindent 6 }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "house-helper.serviceAccountName" . }}
+      
+      {{- if .Values.initContainers.dbMigration.enabled }}
+      initContainers:
+        - name: db-migration
+          image: {{ include "house-helper.image" (dict "registry" .Values.global.imageRegistry "repository" .Values.initContainers.dbMigration.image.repository "tag" .Values.initContainers.dbMigration.image.tag) }}
+          command: {{ .Values.initContainers.dbMigration.command | toJson }}
+          envFrom:
+            {{- include "house-helper.envFromSecrets" . | nindent 12 }}
+          env:
+            {{- include "house-helper.commonEnv" . | nindent 12 }}
+            - name: DB_CONNECTION_STRING
+              value: {{ include "house-helper.dbConnectionString" . | quote }}
+      {{- end }}
+      
+      containers:
+        - name: api
+          {{- include "house-helper.securityContext" . | nindent 10 }}
+          image: {{ include "house-helper.image" (dict "registry" .Values.global.imageRegistry "repository" .Values.api.image.repository "tag" .Values.api.image.tag) }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.api.service.targetPort }}
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          envFrom:
+            {{- include "house-helper.envFromSecrets" . | nindent 12 }}
+            {{- with .Values.api.envFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            {{- include "house-helper.commonEnv" . | nindent 12 }}
+            {{- range $key, $value := .Values.api.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: DB_CONNECTION_STRING
+              value: {{ include "house-helper.dbConnectionString" . | quote }}
+            - name: REDIS_URL
+              value: {{ include "house-helper.redisConnectionString" . | quote }}
+            - name: KAFKA_BROKERS
+              value: {{ include "house-helper.kafkaBootstrapServers" . | quote }}
+          {{- with .Values.api.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.api.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- include "house-helper.resources" .Values.api | nindent 10 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "house-helper.fullname" . }}-config
+        - name: tmp
+          emptyDir: {}
+      
+      {{- with .Values.api.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,45 @@
+{{- if .Values.configMap.create -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "house-helper.fullname" . }}-config
+  namespace: {{ include "house-helper.namespace" . }}
+  labels:
+    {{- include "house-helper.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.configMap.data }}
+  {{ $key }}: |
+    {{- $value | nindent 4 }}
+  {{- end }}
+  
+  # Database configuration
+  database.conf: |
+    max_connections: {{ .Values.api.env.DB_MAX_CONNECTIONS | default "100" }}
+    connection_timeout: 5s
+    pool_size: 20
+    log_queries: {{ ne .Values.environment "prod" }}
+  
+  # Redis configuration
+  redis.conf: |
+    db: {{ .Values.api.env.REDIS_DB | default "0" }}
+    max_retries: 3
+    retry_delay_ms: 100
+    connection_timeout: 5s
+    command_timeout: 3s
+  
+  # Kafka configuration
+  kafka.conf: |
+    consumer_group: {{ .Values.kafkaConsumer.env.CONSUMER_GROUP | default "house-helper-consumers" }}
+    session_timeout_ms: 30000
+    heartbeat_interval_ms: 3000
+    max_poll_records: {{ .Values.kafkaConsumer.env.MAX_POLL_RECORDS | default "500" }}
+    enable_auto_commit: false
+    auto_offset_reset: earliest
+  
+  # Temporal configuration
+  temporal.conf: |
+    namespace: {{ .Values.global.projectName }}
+    worker_concurrency: {{ .Values.temporalWorker.env.WORKER_CONCURRENCY | default "10" }}
+    max_concurrent_workflows: {{ .Values.temporalWorker.env.MAX_CONCURRENT_WORKFLOWS | default "100" }}
+    task_queue: house-helper-tasks
+{{- end }}
