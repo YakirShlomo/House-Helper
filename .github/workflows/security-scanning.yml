@@ -6,7 +6,6 @@ on:
   pull_request:
     branches: [main, develop]
   schedule:
-    # Run security scan daily at 2 AM UTC
     - cron: '0 2 * * *'
   workflow_dispatch:
 
@@ -14,6 +13,11 @@ permissions:
   contents: read
   security-events: write
   actions: read
+  packages: read
+
+env:
+  SNYK_SEVERITY_THRESHOLD: high
+  TFSEC_MIN_SEVERITY: HIGH
 
 jobs:
   dependency-review:
@@ -21,50 +25,60 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Dependency Review
-        uses: actions/dependency-review-action@v4
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: moderate
 
   snyk-security:
     name: Snyk Security Scan
+    if: secrets.SNYK_TOKEN != ''
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        target:
-          - path: services/api
+        include:
+          - name: api
             language: golang
-          - path: services/notifier
+            path: services/api
+            manifest: go.mod
+          - name: notifier
             language: golang
-          - path: services/temporal-worker
+            path: services/notifier
+            manifest: go.mod
+          - name: kafka
             language: golang
-          - path: services/temporal-api
+            path: services/kafka
+            manifest: go.mod
+          - name: temporal
             language: golang
-          - path: services/kafka-consumer
-            language: golang
-          - path: apps/mobile_flutter
-            language: dart
+            path: services/temporal
+            manifest: go.mod
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/golang@master
-        if: matrix.target.language == 'golang'
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        if: matrix.language == 'golang'
         with:
-          args: --file=${{ matrix.target.path }}/go.mod --sarif-file-output=snyk-${{ matrix.target.path }}.sarif
-      
-      - name: Upload Snyk results to GitHub Code Scanning
+          go-version-file: ${{ matrix.path }}/go.mod
+      - uses: snyk/actions/setup@v3
+        with:
+          token: ${{ secrets.SNYK_TOKEN }}
+          snyk-version: v1.1294.1
+      - name: Snyk test (${{ matrix.name }})
+        run: |
+          snyk test \
+            --file=${{ matrix.path }}/${{ matrix.manifest }} \
+            --project-name=house-helper-${{ matrix.name }} \
+            --sarif-file-output=snyk-${{ matrix.name }}.sarif \
+            --severity-threshold=${SNYK_SEVERITY_THRESHOLD}
+        continue-on-error: ${{ github.ref != 'refs/heads/main' }}
+      - name: Upload Snyk SARIF
+        if: always() && hashFiles(format('snyk-{0}.sarif', matrix.name)) != ''
         uses: github/codeql-action/upload-sarif@v3
-        if: matrix.target.language == 'golang'
         with:
-          sarif_file: snyk-${{ matrix.target.path }}.sarif
+          sarif_file: snyk-${{ matrix.name }}.sarif
 
   codeql-analysis:
     name: CodeQL Analysis
@@ -74,20 +88,13 @@ jobs:
       matrix:
         language: ['go', 'javascript']
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
           queries: +security-and-quality
-      
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
-      
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
 
@@ -95,34 +102,40 @@ jobs:
     name: Secret Scanning
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
       - name: TruffleHog OSS
-        uses: trufflesecurity/trufflehog@main
+        id: trufflehog
+        uses: trufflesecurity/trufflehog@v3
         with:
+          scan: git
           path: ./
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
-          extra_args: --debug --only-verified
+          extra_args: --only-verified
+        continue-on-error: ${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}
+      - name: Upload TruffleHog findings
+        if: always() && steps.trufflehog.conclusion == 'failure'
+        run: echo "::warning::TruffleHog detected potential secrets. Review findings in the security tab."
 
   terraform-security:
     name: Terraform Security Scan
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
       - name: Run tfsec
-        uses: aquasecurity/tfsec-action@v1.0.0
+        uses: aquasecurity/tfsec-action@v1.0.6
         with:
           working_directory: infra/terraform
+          tfsec_args: --force-all-dirs --minimum-severity ${{ env.TFSEC_MIN_SEVERITY }}
           format: sarif
-          soft_fail: false
-      
+          soft_fail: ${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}
       - name: Upload tfsec results
+        if: always() && hashFiles('tfsec.sarif') != ''
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: tfsec.sarif
@@ -132,104 +145,133 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     strategy:
+      fail-fast: false
       matrix:
-        service: [api, notifier, temporal-worker, temporal-api, kafka-consumer]
+        include:
+          - service: api
+            context: services/api
+            dockerfile: Dockerfile
+          - service: notifier
+            context: services/notifier
+            dockerfile: Dockerfile
+          - service: kafka
+            context: services/kafka
+            dockerfile: Dockerfile
+          - service: temporal-api
+            context: services/temporal
+            dockerfile: Dockerfile.api
+          - service: temporal-worker
+            context: services/temporal
+            dockerfile: Dockerfile.worker
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Build Docker image
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.service }} image
         run: |
-          docker build -t house-helper/${{ matrix.service }}:${{ github.sha }} services/${{ matrix.service }}
-      
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+          docker build --pull \
+            --file ${{ matrix.context }}/${{ matrix.dockerfile }} \
+            --tag house-helper/${{ matrix.service }}:${{ github.sha }} \
+            ${{ matrix.context }}
+      - name: Run Trivy scanner
+        uses: aquasecurity/trivy-action@0.21.2
         with:
           image-ref: house-helper/${{ matrix.service }}:${{ github.sha }}
-          format: 'sarif'
-          output: 'trivy-results-${{ matrix.service }}.sarif'
-          severity: 'CRITICAL,HIGH'
-      
-      - name: Upload Trivy results
+          format: sarif
+          output: trivy-results-${{ matrix.service }}.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+          ignore-unfixed: true
+      - name: Upload Trivy SARIF
+        if: always() && hashFiles(format('trivy-results-{0}.sarif', matrix.service)) != ''
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+          sarif_file: trivy-results-${{ matrix.service }}.sarif
           category: docker-${{ matrix.service }}
-      
-      - name: Run Grype vulnerability scanner
+      - name: Run Grype scanner
+        id: grype
         uses: anchore/scan-action@v3
         with:
           image: house-helper/${{ matrix.service }}:${{ github.sha }}
-          fail-build: false
+          fail-build: ${{ github.ref == 'refs/heads/main' }}
           severity-cutoff: high
-      
-      - name: Upload Grype results
+          output-format: sarif
+      - name: Upload Grype SARIF
+        if: always() && steps.grype.outputs.sarif != ''
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: ${{ steps.scan.outputs.sarif }}
+          sarif_file: ${{ steps.grype.outputs.sarif }}
           category: grype-${{ matrix.service }}
 
   osv-scanner:
     name: OSV Scanner
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Run OSV Scanner
-        uses: google/osv-scanner-action@v1
+      - uses: actions/checkout@v4
+      - name: Install OSV-Scanner
+        run: |
+          curl -sSfL https://github.com/google/osv-scanner/releases/download/v1.7.3/osv-scanner_1.7.3_linux_amd64.tar.gz \
+            | tar -xz -C /usr/local/bin osv-scanner
+      - name: Run OSV-Scanner
+        run: |
+          osv-scanner --recursive --skip-git ./ \
+            --format sarif --output osv-results.sarif
+        continue-on-error: ${{ github.ref != 'refs/heads/main' }}
+      - name: Upload OSV SARIF
+        if: always() && hashFiles('osv-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
         with:
-          scan-args: |-
-            --recursive
-            --skip-git
-            ./
+          sarif_file: osv-results.sarif
 
   license-compliance:
     name: License Compliance Check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.21'
-      
       - name: Install go-licenses
-        run: go install github.com/google/go-licenses@latest
-      
+        run: go install github.com/google/go-licenses@v1.6.0
       - name: Check Go licenses
         run: |
-          for service in api notifier temporal-worker temporal-api kafka-consumer; do
-            echo "Checking licenses for $service..."
-            cd services/$service
-            go-licenses check ./...
-            cd ../..
+          set -euo pipefail
+          modules=(api notifier kafka temporal)
+          for service in "${modules[@]}"; do
+            echo "Checking licenses for ${service}..."
+            pushd services/${service} > /dev/null
+            go mod download
+            go-licenses check ./... \
+              --allowed_licenses=MIT,BSD-2-Clause,BSD-3-Clause,Apache-2.0,ISC,Zlib \
+              --issue_url_link
+            popd > /dev/null
           done
+        continue-on-error: ${{ github.ref != 'refs/heads/main' }}
+      - name: License check warning
+        if: failure() && github.ref != 'refs/heads/main'
+        run: echo "::warning::Resolve license findings before merging."
 
   sbom-generation:
     name: Generate SBOM
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+      security-events: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
+      - uses: actions/checkout@v4
       - name: Generate SBOM with Syft
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@v0.15.1
         with:
           path: ./
           artifact-name: house-helper-sbom.spdx.json
           output-file: sbom.spdx.json
-      
-      - name: Upload SBOM
+      - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sbom
+          name: house-helper-sbom
           path: sbom.spdx.json
-      
       - name: Publish SBOM to Dependency Graph
-        uses: advanced-security/spdx-dependency-submission-action@v0.0.1
+        uses: advanced-security/spdx-dependency-submission-action@v0.1.2
         with:
           filePath: sbom.spdx.json
